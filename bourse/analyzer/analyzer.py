@@ -17,6 +17,7 @@ def store_file(name, website):
         except:
             year = name.split()[1].split("-")[0]
             df = pd.read_pickle("/home/bourse/data/" + year + "/" + name)
+            #db.df_write(df, )
             print(df)
         # to be finished
 
