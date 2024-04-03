@@ -1,19 +1,18 @@
-from dash import html, dash, dcc, Output, Input, State
+import dash
+from dash import html, dcc
+import dash.dependencies as ddep
 import pandas as pd
-import plotly.graph_objects as go
+import sqlalchemy
+import plotly.graph_objs as go
 
-data = pd.DataFrame({
-    'Year': [2019, 2019, 2019, 2020, 2020, 2020, 2021, 2021, 2021],
-    'City': ['Paris', 'New York', 'London', 'Paris', 'New York', 'London', 'Paris', 'New York', 'London'],
-    'Action': ['Action1', 'Action1', 'Action1', 'Action2', 'Action2', 'Action2', 'Action3', 'Action3', 'Action3'],
-    'Value': [100, 120, 110, 90, 110, 100, 130, 100, 120]
-})
+DATABASE_URI = 'timescaledb://ricou:monmdp@db:5432/bourse'
+engine = sqlalchemy.create_engine(DATABASE_URI)
 
 app = dash.Dash(__name__, title="Boursorama - Dashboard", suppress_callback_exceptions=True)
 server = app.server
 
 styles = {
-    'color': 'white',
+    'color': 'black',
     'border-radius': '20px',
 }
 
@@ -24,103 +23,139 @@ img_style = {
     'margin': '30px'
 }
 
-final_styles = {**styles}
-
-years = [{'label': str(year), 'value': year} for year in data['Year'].unique()]
-cities = [{'label': city, 'value': city} for city in data['City'].unique()]
-actions = [{'label': action, 'value': action} for action in data['Action'].unique()]
+ROWS_PER_PAGE = 10
 
 app.layout = html.Div([
     html.Img(src='assets/logoboursorama.jpg', style=img_style),
-    html.Div(id='main-container', children=[
-        html.Div([
-            html.Div([
-                dcc.Dropdown(
-                    id='year-dropdown',
-                    options=years,
-                    placeholder='Select Year',
-                    clearable=False,
-                    style={'width': '150px', 'border-radius': '10px', 'border': '1px solid', 'margin-right': '40px',
-                           'color': 'black'}
-                ),
-            ], style={'margin-right': '20px'}),
-            html.Div([
-                dcc.Dropdown(
-                    id='action-dropdown',
-                    options=actions,
-                    placeholder='Select Action',
-                    clearable=False,
-                    style={'width': '150px', 'border-radius': '10px', 'border': '1px solid', 'margin-right': '40px',
-                           'color': 'black'},
-                ),
-            ], style={'margin-right': '20px'}),
-            html.Div([
-                dcc.Dropdown(
-                    id='city-dropdown',
-                    options=cities,
-                    clearable=False,
-                    placeholder='Select City',
-                    style={'width': '150px', 'border-radius': '10px', 'border': '1px solid', 'color': 'black'},
-                ),
-            ]),
-        ], style={'margin-bottom': '40px', 'display': 'flex', 'justify-content': 'center'}),
-        html.Button('Display Table', id='execute-query', n_clicks=0, style={'border': '1px solid',
-                                                                            'display': 'block', 'margin': 'auto',
-                                                                            'margin-bottom': '20px'}),
-        html.Div(id='query-result-container', style={'text-align': 'center', 'color': 'black', 'margin-top': '20px'}),
-        html.Div(id='display-graph-container', style={'margin-top': '20px'}),
-        html.Div(id='graph-container', style={'text-align': 'center', 'color': 'black'})
-    ])
+
+    dcc.Dropdown(
+        id='market-dropdown',
+        options=[],
+        placeholder="Select a market",
+        style={'border-radius': '10px', 'border': '1px solid', 'color': 'black'}
+    ),
+
+    html.Div(id='market-actions', style={'margin-top': '20px', 'margin-bottom': '20px'}),
+
+    html.Div(id='display-button-container'),
+
+    html.Div(id='stock-table-container', style={'margin': 'auto', 'text-align': 'center',
+                                                'width': '80%', 'padding-top': '50px'}),
+
+    html.Div(id='display-graph-button-container', style={'margin-top': '20px'}),
+
+    html.Div(id='stock-graph-container', style={'margin': 'auto', 'text-align': 'center',
+                                                'width': '80%', 'padding-top': '30px'})
+
 ], style=styles)
 
 
 @app.callback(
-    Output('query-result-container', 'children'),
-    [Input('execute-query', 'n_clicks')],
-    [State('year-dropdown', 'value'),
-     State('action-dropdown', 'value'),
-     State('city-dropdown', 'value')]
+    ddep.Output('market-dropdown', 'options'),
+    [ddep.Input('market-dropdown', 'value')]
 )
-def update_table(n_clicks, selected_year, selected_action, selected_city):
-    if n_clicks == 0:
-        return ''
-    if not selected_year or not selected_action or not selected_city:
-        return ''
-    filtered_data = data[
-        (data['Year'] == selected_year) & (data['Action'] == selected_action) & (data['City'] == selected_city)]
-    table = html.Table(
-        [html.Tr([html.Th(col) for col in filtered_data.columns])] +
-        [html.Tr([html.Td(filtered_data.iloc[i][col]) for col in filtered_data.columns]) for i in
-         range(len(filtered_data))]
-    )
-    return html.Div(table, style={'display': 'inline-block'})
+def update_market_dropdown(value):
+    with engine.connect() as conn:
+        markets_df = pd.read_sql('SELECT * FROM markets;', conn)
+
+    options = [{'label': f"{row['name']} - {row['alias']}", 'value': row['id']} for _, row in markets_df.iterrows()]
+    return options
 
 
 @app.callback(
-    Output('display-graph-container', 'children'),
-    [Input('execute-query', 'n_clicks')]
+    ddep.Output('market-actions', 'children'),
+    [ddep.Input('market-dropdown', 'value')]
+)
+def update_market_actions(selected_market):
+    if selected_market is None:
+        return html.Div()
+
+    with engine.connect() as conn:
+        query = f"SELECT name, symbol FROM companies WHERE mid = {selected_market};"
+        actions_df = pd.read_sql(query, conn)
+
+    actions_dropdown = dcc.Dropdown(
+        id='actions-dropdown',
+        options=[{'label': f"{row['name']} - {row['symbol']}", 'value': row['symbol']} for _, row in
+                 actions_df.iterrows()],
+        multi=False,
+        placeholder="Select companies...",
+        style={'border-radius': '10px', 'border': '1px solid', 'color': 'black'}
+    )
+
+    return actions_dropdown
+
+
+@app.callback(
+    ddep.Output('display-button-container', 'children'),
+    [ddep.Input('actions-dropdown', 'value')]
+)
+def display_button(selected_action):
+    if selected_action:
+        return html.Button('Display Table', id='display-table', n_clicks=0,
+                           style={'color': 'black', 'margin': 'auto', 'display': 'block'})
+    else:
+        return None
+
+
+@app.callback(
+    ddep.Output('stock-table-container', 'children'),
+    [ddep.Input('display-table', 'n_clicks')],
+    [ddep.State('actions-dropdown', 'value')]
+)
+def display_stock_table(n_clicks, selected_action):
+    if n_clicks > 0 and selected_action:
+        query = f"SELECT * FROM stocks WHERE cid = (SELECT id - 1 FROM companies WHERE symbol = '{selected_action}');"
+        with engine.connect() as conn:
+            stocks_df = pd.read_sql(query, conn)
+
+        stocks_df['date'] = pd.to_datetime(stocks_df['date']).dt.strftime('%Y-%m-%d, %T.%f')
+
+        stock_table = html.Table(
+            [html.Tr([html.Th(col) for col in stocks_df.columns])] +
+            [html.Tr([html.Td(stocks_df.iloc[i][col]) for col in stocks_df.columns]) for i in range(len(stocks_df))]
+        )
+
+        if len(stocks_df) > 0:
+            return html.Div([stock_table], style={'overflowY': 'scroll', 'height': '500px'})
+        else:
+            return html.Div("No data available.")
+
+    else:
+        return None
+
+
+@app.callback(
+    ddep.Output('display-graph-button-container', 'children'),
+    [ddep.Input('display-table', 'n_clicks')]
 )
 def display_graph_button(n_clicks):
-    if n_clicks == 0:
-        return ''
-    return html.Button('Display Graphic', id='display-graphic', n_clicks=0,
-                       style={'border': '1px solid', 'display': 'block', 'margin': 'auto'})
+    if n_clicks:
+        return html.Button('Display Graphic', id='display-graph', n_clicks=0,
+                           style={'color': 'black', 'margin': 'auto', 'display': 'block'})
+    else:
+        return None
 
 
 @app.callback(
-    Output('graph-container', 'children'),
-    [Input('display-graphic', 'n_clicks')],
-    [State('year-dropdown', 'value'),
-     State('city-dropdown', 'value')]
+    ddep.Output('stock-graph-container', 'children'),
+    [ddep.Input('display-graph', 'n_clicks')],
+    [ddep.State('actions-dropdown', 'value')]
 )
-def draw_graph(n_clicks, selected_year, selected_city):
-    if n_clicks == 0:
-        return ''
-    if not selected_year or not selected_city:
-        return ''
-    filtered_data = data[(data['Year'] == selected_year) & (data['City'] == selected_city)]
-    fig = go.Figure(data=[go.Scatter(x=filtered_data['Year'], y=filtered_data['Value'], mode='lines+markers')])
-    return dcc.Graph(figure=fig)
+def display_stock_graph(n_clicks, selected_action):
+    if n_clicks and selected_action:
+        query = f"SELECT * FROM stocks WHERE cid = (SELECT id - 1 FROM companies WHERE symbol = '{selected_action}');"
+        with engine.connect() as conn:
+            stocks_df = pd.read_sql(query, conn)
+
+        if not stocks_df.empty:
+            stocks_df['date'] = pd.to_datetime(stocks_df['date'])
+            trace = go.Scatter(x=stocks_df['date'], y=stocks_df['volume'], mode='lines+markers', name='Stock Volume')
+            layout = go.Layout(title=f'Stock Volume - {selected_action}', xaxis=dict(title='Date'),
+                               yaxis=dict(title='Volume'), title_x=0.5)
+            fig = go.Figure(data=[trace], layout=layout)
+            return dcc.Graph(id='stock-graph', figure=fig, style={'width': '100%', 'margin': 'auto'})
+    return None
 
 
 if __name__ == '__main__':
