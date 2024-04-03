@@ -42,10 +42,10 @@ app.layout = html.Div([
     html.Div(id='stock-table-container', style={'margin': 'auto', 'text-align': 'center',
                                                 'width': '80%', 'padding-top': '50px'}),
 
-    html.Div(id='display-graph-button-container', style={'margin-top': '20px'}),
+    html.Div(id='display-graph-button-container', style={'margin-top': '20px', 'margin-bottom': '20px'}),
 
     html.Div(id='stock-graph-container', style={'margin': 'auto', 'text-align': 'center',
-                                                'width': '80%', 'padding-top': '30px'})
+                                                'width': '60%', 'padding-top': '30px'}),
 
 ], style=styles)
 
@@ -131,8 +131,21 @@ def display_stock_table(n_clicks, selected_action):
 )
 def display_graph_button(n_clicks):
     if n_clicks:
-        return html.Button('Display Graphic', id='display-graph', n_clicks=0,
-                           style={'color': 'black', 'margin': 'auto', 'display': 'block'})
+        graph_button = html.Button('Display Graphic', id='display-graph', n_clicks=0,
+                                   style={'color': 'black', 'margin': 'auto', 'display': 'block'})
+
+        graph_parameter_dropdown = dcc.Dropdown(
+            id='graph-parameter-dropdown',
+            options=[
+                {'label': 'Value', 'value': 'value'},
+                {'label': 'Volume', 'value': 'volume'}
+            ],
+            value='value',
+            placeholder="Select parameter for graph",
+            style={'border-radius': '10px', 'border': '1px solid', 'color': 'black'},
+        )
+
+        return html.Div([graph_button, graph_parameter_dropdown], style={'margin-top': '20px'})
     else:
         return None
 
@@ -140,9 +153,10 @@ def display_graph_button(n_clicks):
 @app.callback(
     ddep.Output('stock-graph-container', 'children'),
     [ddep.Input('display-graph', 'n_clicks')],
-    [ddep.State('actions-dropdown', 'value')]
+    [ddep.State('actions-dropdown', 'value'),
+     ddep.State('graph-parameter-dropdown', 'value')]
 )
-def display_stock_graph(n_clicks, selected_action):
+def display_stock_graph(n_clicks, selected_action, parameter):
     if n_clicks and selected_action:
         query = f"SELECT * FROM stocks WHERE cid = (SELECT id - 1 FROM companies WHERE symbol = '{selected_action}');"
         with engine.connect() as conn:
@@ -150,9 +164,10 @@ def display_stock_graph(n_clicks, selected_action):
 
         if not stocks_df.empty:
             stocks_df['date'] = pd.to_datetime(stocks_df['date'])
-            trace = go.Scatter(x=stocks_df['date'], y=stocks_df['volume'], mode='lines+markers', name='Stock Volume')
-            layout = go.Layout(title=f'Stock Volume - {selected_action}', xaxis=dict(title='Date'),
-                               yaxis=dict(title='Volume'), title_x=0.5)
+            trace = go.Scatter(x=stocks_df['date'], y=stocks_df[parameter], mode='lines+markers',
+                               name=parameter.capitalize())
+            layout = go.Layout(title=f'Stock {parameter.capitalize()} - {selected_action}', xaxis=dict(title='Date'),
+                               yaxis=dict(title=parameter.capitalize()), title_x=0.5)
             fig = go.Figure(data=[trace], layout=layout)
             return dcc.Graph(id='stock-graph', figure=fig, style={'width': '100%', 'margin': 'auto'})
     return None
