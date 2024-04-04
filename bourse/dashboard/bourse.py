@@ -105,7 +105,7 @@ def display_button(selected_action):
 )
 def display_stock_table(n_clicks, selected_action):
     if n_clicks > 0 and selected_action:
-        query = f"SELECT * FROM stocks WHERE cid = (SELECT id - 1 FROM companies WHERE symbol = '{selected_action}');"
+        query = f"SELECT * FROM stocks WHERE cid = (SELECT id FROM companies WHERE symbol = '{selected_action}');"
         with engine.connect() as conn:
             stocks_df = pd.read_sql(query, conn)
 
@@ -158,7 +158,7 @@ def display_graph_button(n_clicks):
 )
 def display_stock_graph(n_clicks, selected_action, parameter):
     if n_clicks and selected_action:
-        query = f"SELECT * FROM stocks WHERE cid = (SELECT id - 1 FROM companies WHERE symbol = '{selected_action}');"
+        query = f"SELECT * FROM stocks WHERE cid = (SELECT id FROM companies WHERE symbol = '{selected_action}');"
         with engine.connect() as conn:
             stocks_df = pd.read_sql(query, conn)
 
