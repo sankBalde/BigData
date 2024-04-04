@@ -44,8 +44,8 @@ app.layout = html.Div([
 
     html.Div(id='display-graph-button-container', style={'margin-top': '20px', 'margin-bottom': '20px'}),
 
-    html.Div(id='stock-graph-container', style={'margin': 'auto', 'text-align': 'center',
-                                                'width': '60%', 'padding-top': '30px'}),
+    html.Div(id='stock-graphs-container', style={'margin': 'auto', 'text-align': 'center',
+                                                 'width': '80%', 'padding-top': '30px'}),
 
 ], style=styles)
 
@@ -151,7 +151,7 @@ def display_graph_button(n_clicks):
 
 
 @app.callback(
-    ddep.Output('stock-graph-container', 'children'),
+    ddep.Output('stock-graphs-container', 'children'),
     [ddep.Input('display-graph', 'n_clicks')],
     [ddep.State('actions-dropdown', 'value'),
      ddep.State('graph-parameter-dropdown', 'value')]
@@ -166,10 +166,29 @@ def display_stock_graph(n_clicks, selected_action, parameter):
             stocks_df['date'] = pd.to_datetime(stocks_df['date'])
             trace = go.Scatter(x=stocks_df['date'], y=stocks_df[parameter], mode='lines+markers',
                                name=parameter.capitalize())
-            layout = go.Layout(title=f'Stock {parameter.capitalize()} - {selected_action}', xaxis=dict(title='Date'),
+            layout = go.Layout(title=f'Graphic - {selected_action}', xaxis=dict(title='Date'),
                                yaxis=dict(title=parameter.capitalize()), title_x=0.5)
             fig = go.Figure(data=[trace], layout=layout)
-            return dcc.Graph(id='stock-graph', figure=fig, style={'width': '100%', 'margin': 'auto'})
+
+            rolling_mean = stocks_df[parameter].rolling(window=20).mean()
+            rolling_std = stocks_df[parameter].rolling(window=20).std()
+            upper_band = rolling_mean + (rolling_std * 2)
+            lower_band = rolling_mean - (rolling_std * 2)
+
+            trace_bollinger_upper = go.Scatter(x=stocks_df['date'], y=upper_band,
+                                               mode='lines', name='Upper Bollinger Band')
+            trace_bollinger_lower = go.Scatter(x=stocks_df['date'], y=lower_band,
+                                               mode='lines', name='Lower Bollinger Band')
+
+            return html.Div([
+                dcc.Graph(id='stock-graph', figure=fig, style={'width': '50%', 'display': 'inline-block'}),
+                dcc.Graph(id='bollinger-graph', figure={'data': [trace_bollinger_upper, trace_bollinger_lower],
+                                                        'layout': go.Layout(title=f'Bollinger Band - {selected_action}',
+                                                                            xaxis=dict(title='Date'),
+                                                                            yaxis=dict(title=parameter.capitalize()),
+                                                                            title_x=0.5)},
+                          style={'width': '50%', 'display': 'inline-block'})
+            ])
     return None
 
 
