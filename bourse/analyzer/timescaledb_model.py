@@ -16,9 +16,9 @@ class TimescaleStockMarketModel:
     def __init__(self, database, user=None, host=None, password=None, port=None):
         """Create a TimescaleStockMarketModel
 
-        database -- The name of the persistence database.
-        user     -- Username to connect with to the database. Same as the
-                    database name by default.
+        database_old -- The name of the persistence database_old.
+        user     -- Username to connect with to the database_old. Same as the
+                    database_old name by default.
 
         """
 
@@ -39,7 +39,7 @@ class TimescaleStockMarketModel:
         self.__boursorama_cid = {}  # cid from netfonds symbol
         self.__market_id = {}  # id of markets from aliases
 
-        self.logger.info("Setup database generates an error if it exists already, it's ok")
+        self.logger.info("Setup database_old generates an error if it exists already, it's ok")
         self._setup_database()
 
 
@@ -144,7 +144,7 @@ class TimescaleStockMarketModel:
     def df_write(self, df, table, args=None, commit=False,
                  if_exists='append', index=True, index_label=None,
                  chunksize=1000, dtype=None, method="multi"):
-        '''Write a Pandas dataframe to the Postgres SQL database
+        '''Write a Pandas dataframe to the Postgres SQL database_old
 
         :param query:
         :param args: arguments for the query
@@ -198,7 +198,7 @@ class TimescaleStockMarketModel:
 
     def search_company_id(self, name, getmax=1, strict=False):
         '''
-        Try to find the id of a company in our database.
+        Try to find the id of a company in our database_old.
 
         :param name: name of the company (or part of)
         :getmax: number of answers wanted

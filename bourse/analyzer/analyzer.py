@@ -1,4 +1,3 @@
-import pandas as pd
 import numpy as np
 import sklearn
 import os
@@ -108,6 +107,11 @@ def store_file(name, website):
 
 
 if __name__ == '__main__':
-    store_market("boursorama", "compA", year="2023")
+    market_list = ["compA", "compB", "euronx", "lse", "milano", "dbx", "mercados", "amsterdam", "xetra", "bruxelle"]
+    years = ["2019", "2020", "2021", "2022", "2023"]
+    for year in years:
+        for market in market_list:
+            store_market("boursorama", market_name=market, year=year)
+    #store_market("boursorama", "compA", year="2023")
     #store_file("amsterdam 2020-01-01 09:02:02.532411.bz2", "boursorama")
     print("Done")

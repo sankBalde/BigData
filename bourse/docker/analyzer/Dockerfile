@@ -8,11 +8,14 @@ ENV DEBIAN_FRONTEND noninteractive
 
 RUN apt-get update                              \
     && apt-get install -y --no-install-recommends   \
-       python3 git make python3-pip python3-setuptools cron bzip2 tzdata
+       python3 git make python3-pip python3-setuptools cron bzip2 tzdata python3-venv
 
-RUN pip3 install pip --upgrade
+#RUN pip3 install pip --upgrade
+RUN python3 -m venv /home/bourse/.venv
+
 COPY requirements.txt /tmp/
-RUN pip install -r /tmp/requirements.txt
+RUN /home/bourse/.venv/bin/python3 -m pip install -r /tmp/requirements.txt
+#RUN pip install -r /tmp/requirements.txt
 
 RUN apt-get update && apt-get install -y locales && rm -rf /var/lib/apt/lists/* \
 	&& localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
@@ -37,4 +40,4 @@ ADD apps.tgz .
 # CMD service cron start  && \
 #     tail -f /var/log/cron.log
 
-CMD python3 analyzer.py
+CMD /home/bourse/.venv/bin/python3 analyzer.py
