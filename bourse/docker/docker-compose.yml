@@ -29,8 +29,13 @@ services:
         - db
     networks:
       - boursenet
+    restart: on-failure
     volumes:
       - /tmp/boursorama:/home/bourse/data/
+    deploy:
+      resources:
+        limits:
+          cpus: "0.7"
 
   dashboard:
     image: my_dashboard
