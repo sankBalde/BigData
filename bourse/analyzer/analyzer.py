@@ -58,36 +58,86 @@ def firstFiltering(df, year: str = "2023"):
     return df
 
 
-def store_market(website, market_name, year):
-    if website.lower() == "boursorama":
-        market_id = db.raw_query('SELECT (id) FROM markets WHERE LOWER(alias) LIKE LOWER(%s)',
-                                 (market_name ,))[0][0]
-        logger.info("market name id: %s", str(market_id))
+def drop_par_chunks(df, chunk_size=10000):
+    def process_chunk(chunk):
+        return chunk.dropna()
 
-        logger.info("START FILTERING: ")
+    chunks = []
+    for i in range(0, len(df), chunk_size):
+        chunks.append(process_chunk(df[i:i + chunk_size]))
+    df = pd.concat(chunks)
+    return df
+
+
+def filter_amsterdam(df, year: str = "2020"):
+    # amsterdam['last'] = amsterdam['last'].str.replace('(c)', '')
+    df["last"] = df["last"].str.replace('(c)', '')
+    df["last"] = df["last"].str.replace('(s)', '')
+    df["last"] = df["last"].str.replace(' ', '').astype(float)
+
+    df = drop_par_chunks(df)
+    df = df.reset_index(level=1, drop=True)
+    df = df.rename_axis('date', axis=0)
+
+    return df
+
+def store_market(website, market_name, year, last_companies_lenght):
+    if website.lower() == "boursorama":
+
+        if market_name == "peapme" and year == "2021":
+            market_id = 11
+            #insert dans la markets peapme
+            data = {
+                'id': [11],
+                'name': ['peapme'],
+                'alias': ['peapme']
+            }
+            df_peapme = pd.DataFrame(data)
+
+            db.df_write(df_peapme, table='markets', if_exists='append', index=False)
+            
+      
+        else:
+            market_id = db.raw_query('SELECT (id) FROM markets WHERE LOWER(alias) LIKE LOWER(%s)',
+                                     (market_name,))[0][0]
+
+        logger.info("market name: %s id: %s", market_name, str(market_id))
+
+        logger.info("START FILTERING: %s", year)
         start_time = time.time()
         df = collecte_df(directory_path="/home/bourse/data/" + year, market_name=market_name)
-
-        df = firstFiltering(df, year)
+        if market_name == "amsterdam":
+            df = filter_amsterdam(df, year)
+        else:
+            df = firstFiltering(df, year)
         logger.info("---filtering and collecting  %s min ---", str((time.time() - start_time) / 60))
 
         df['last'] = df['last'].astype(int)
         df['volume'] = df['volume'].astype(int)
 
-        logger.info("END filter: columns: %s", df.columns)
+        #logger.info("END filter: columns: %s", df.columns)
 
         df.rename(columns={'last': 'value', 'volume': 'volume', 'symbol': 'symbol', 'name': 'name'}, inplace=True)
 
         # Remplir la table companies avec les colonnes name, mid, symbol
         df_BY = df.groupby(by=["name", "symbol"]).mean()
         df_BY.reset_index(inplace=True)
-        df_companies = df_BY[["name", "symbol"]]
-        # df_companies['mid'] = [market_id] * len(df_companies)
-        df_companies.loc[:, 'mid'] = market_id
-        #logger.info("companies groupby: %s", df_companies)
-        start_time = time.time()
-        db.df_write(df_companies, table='companies', if_exists='fail', index=False)
-        logger.info("---companies writting in db  %s min ---", str((time.time() - start_time)/ 60))
+        if (year == "2019" and (market_name == "amsterdam" or market_name == "compA" or market_name == "compB")) or (year =="2021" and market_name =="peapme"):
+            df_companies = df_BY[["name", "symbol"]]
+            ids = list(range(last_companies_lenght, len(df_companies) + last_companies_lenght))
+            last_companies_lenght += len(df_companies)
+            logger.info("Last len companies table: %s", str(last_companies_lenght))
+            # df_companies['mid'] = [market_id] * len(df_companies)
+            df_companies.loc[:, 'mid'] = market_id
+            df_companies['id'] = ids
+            #df_companies.reset_index(inplace=True)
+            #df_companies.rename(columns={'index': 'id'}, inplace=True)
+
+            #logger.info("companies groupby: %s", df_companies)
+            start_time = time.time()
+            db.df_write(df_companies, table='companies', if_exists='append', index=False)
+            logger.info("---companies writting in db  %s min ---", str((time.time() - start_time) / 60))
+
         # Remplir la table stocks avec date, cid, value, volume
         df_stocks = df.loc[:, ["value", "volume"]]
 
@@ -100,8 +150,23 @@ def store_market(website, market_name, year):
         #logger.info("Df rename for stocks: %s", df_stocks)
         start_time = time.time()
         # Écrire le dataframe dans la table "stocks"
-        db.df_write(df_stocks, table='stocks', if_exists='fail', index=True, index_label='date')
+       # db.df_write(df_stocks, table='stocks', if_exists='append', index=True, index_label='date')
+
+
+        # Calculer la taille de chaque chunk
+        chunk_size = len(df_stocks) // 10 + (len(df_stocks) % 10 > 0)
+
+        # Diviser le dataframe en 10 chunks et les écrire dans la base de données
+        for i in range(0, len(df_stocks), chunk_size):
+            chunk = df_stocks.iloc[i:i+chunk_size]
+            # Écrire chaque chunk dans la base de données
+            db.df_write(chunk, table='stocks', if_exists='append', index=True, index_label='date')
+
+
+
         logger.info("---stocks writting in db %s min ---", str((time.time() - start_time)/60))
+
+        return last_companies_lenght
 
 
 def store_file(name, website):
@@ -120,7 +185,9 @@ def store_file(name, website):
 
 
 if __name__ == '__main__':
+    start_time = time.time()
     years = ["2019", "2020", "2021", "2022", "2023"]
+    last_companies_lenght = 0
     for year in years:
         list_files = os.listdir("/home/bourse/data/" + year)
         market_list = []
@@ -131,15 +198,22 @@ if __name__ == '__main__':
         logger.info("Year : %s", year)
         logger.info("liste markets : %s", str(market_list))
         for market in market_list:
-            if market != "amsterdam":
-                logger.info("LOADING market name: %s", market)
-                try:
-                    store_market("boursorama", market_name=market, year=year)
-                except ValueError :
-                    print()
-                except IndexError as e:
-                    logger.info(e)
+            #if market != "amsterdam":
+           # if market == "peapme" and year == "2021":
+            #if market == "compB" and year == "2019":
+            logger.info("LOADING market name: %s", market)
+            try:
+                last_companies_lenght = store_market("boursorama", market_name=market, year=year, last_companies_lenght=last_companies_lenght)
+            except ValueError :
+                logger.info(e)
+            except IndexError as e:
+                logger.info(e)
+            except Exception as e:
+                logger.info(e)
+    
+                    
     # store_market("boursorama", "compA", year="2023")
     # store_file("amsterdam 2020-01-01 09:02:02.532411.bz2", "boursorama")
+    logger.info("--- TIME TAKEN TO WRITE IN DB:  %s min ---", str((time.time() - start_time) / 60))
+    
     logger.info("Done")
-
