@@ -9,10 +9,10 @@ make_subdirs:
     done
 
 docker_up:
-	docker-compose -f docker-compose.yml up
+	docker-compose -f docker/docker-compose.yml up
 
 docker_down:
-	docker-compose -f docker-compose.yml down
+	docker-compose -f docker/docker-compose.yml down
 
 clean:
 	@for dir in $(SUBDIRS); do \
