@@ -10,7 +10,7 @@
 - Aller à la racine du projet et lancer la commande `make`. Cette commande va exécuter `make` dans les deux dossiers de Docker (analyzer et dashboard) puis exécuter `docker-compose up`.
 
 ## 2. Lecture des données
-
+- Voici le resultat attendu grace aux images situées à la racine du projet:
 ![plot](pic.png)
 ![plot](pic2.png)
 
