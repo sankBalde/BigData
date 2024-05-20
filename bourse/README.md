@@ -1,6 +1,6 @@
 # Projet BigData
 
-## 1. Lancement du projet
+## 1. Lancement du projet :
 
 ### Étapes de préparation :
 - Télécharger les données depuis Boursorama.
