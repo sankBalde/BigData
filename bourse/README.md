@@ -9,7 +9,7 @@
 - Supprimer le fichier `boursorama.tar`.
 - Aller à la racine du projet et lancer la commande `make`. Cette commande va exécuter `make` dans les deux dossiers de Docker (analyzer et dashboard) puis exécuter `docker-compose up`.
 
-## 2. Lecture des données
+## 2. Affichage du dashboard :
 - Voici le resultat attendu grace aux images situées à la racine du projet:
 ![plot](pic.png)
 ![plot](pic2.png)
@@ -21,7 +21,7 @@
 - Cliquer sur "display table" pour afficher un tableau détaillé des actions sélectionnées, regroupées dans une seule dataframe. Faire défiler la barre de navigation du tableau pour voir toutes les données.
 - Utiliser "display graphic" pour visualiser graphiquement les données. Cela comprend deux graphiques : un graphique basique de l'évolution de la valeur ou du volume des actions, et un graphique des bandes de Bollinger pour chaque action sélectionnée.
 
-## 3. Gestion des problèmes
+## 3. Gestion des problèmes :
 
 ### Analyzer :
 - Filtrage des données après leur injection dans un dataframe :
@@ -34,6 +34,6 @@
 - Pour le marché `amsterdam` :
   - Temps de filtrage excessivement lent. Solution : ne pas intégrer le marché dans la database.
 
-## 4. Temps d'exécution
+## 4. Temps d'exécution :
 
 - Temps d'exécution estimé : ~1 heure.
